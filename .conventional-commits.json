@@ -1,0 +1,17 @@
+{
+  "scopes": {
+    "repo": {
+      "paths": ["*.json", "*.yml", "*.yaml", "*.md", ".gitignore", "LICENSE"]
+    },
+    "conventional-commits": {
+      "paths": ["skills/conventional-commits/**"]
+    },
+    "ai-config": {
+      "paths": [".claude/**", ".agents/**"]
+    }
+  },
+  "requireScope": true,
+  "issueTracker": {
+    "type": "github"
+  }
+}
