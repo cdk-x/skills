@@ -7,6 +7,7 @@ Shared collection of agent skills for the cdk-x organization. Each skill is a se
 ```
 skills/
 ├── conventional-commits/   → Atomic commits with Conventional Commits format
+├── prd/                    → Product Requirements Document generation and publishing
 └── (future skills)
 ```
 
@@ -17,6 +18,7 @@ Skills are symlinked into consuming repos via `.agents/skills/` or `.claude/skil
 | Scope | Path | Description |
 |-------|------|-------------|
 | `conventional-commits` | `skills/conventional-commits/` | The conventional commits skill |
+| `prd` | `skills/prd/` | The PRD skill |
 | `repo` | root-level files | Repository config, CI, docs |
 
 As new skills are added, register them here as scopes.
