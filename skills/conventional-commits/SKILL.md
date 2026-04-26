@@ -1,6 +1,6 @@
 ---
 name: conventional-commits
-description: Guide for making atomic commits using Conventional Commits. Scopes are recommended but optional, and can be configured per-repo via .conventional-commits.json. Use this skill whenever the user wants to commit changes, prepare commits, review staged/unstaged changes before committing, plan a commit strategy, set up scope configuration, or asks about commit message format. Triggers on phrases like "commit", "make a commit", "commit changes", "commit scope X", "prepare commits", "commit strategy", "set up scopes", "configure commits", or any intent to record changes in git history. Also use when the user mentions specific scopes to commit (e.g., "commit auth", "commit api and ui"). ALWAYS use this skill even for simple single-file commits — proper format matters every time.
+description: Guide for making atomic commits using Conventional Commits. Scopes are recommended but optional, discovered automatically from the repo structure. Use this skill whenever the user wants to commit changes, prepare commits, review staged/unstaged changes before committing, plan a commit strategy, or asks about commit message format. Triggers on phrases like "commit", "make a commit", "commit changes", "commit scope X", "prepare commits", "commit strategy", "configure commits", or any intent to record changes in git history. Also use when the user mentions specific scopes to commit (e.g., "commit auth", "commit api and ui"). ALWAYS use this skill even for simple single-file commits — proper format matters every time.
 ---
 
 # Conventional Commits
@@ -48,7 +48,7 @@ Use footers for metadata. The Conventional Commits spec defines a `key: value` o
 
 #### Issue References
 
-Link commits to the issue they implement or fix. The exact syntax depends on your issue tracker — see the `issueTracker` config in `.conventional-commits.json` and `references/issue-tracking.md` for full details.
+Link commits to the issue they implement or fix. The exact syntax depends on your issue tracker — see `references/issue-tracking.md` for full details.
 
 **GitHub Issues (default):**
 ```
@@ -82,13 +82,13 @@ In practice, prefer `Refs:` in individual commits and let the **PR description**
 
 #### Issue Detection During Commit
 
-When preparing commits, the skill will try to detect the relevant issue:
+When preparing commits, detect the relevant issue automatically:
 
 1. **Check the current branch name** — branches like `feature/PROJ-142-oauth-pkce` or `bugfix/123-null-pointer` contain issue references
-2. **Check `.conventional-commits.json`** for `issueTracker` config
+2. **Detect the issue tracker** — if the branch contains a `LETTERS-DIGITS` pattern (e.g., `PROJ-142`), it's Jira; if it's a plain number, it's likely GitHub
 3. **Ask the user** if no issue is detected and one might be relevant
 
-For GitHub repos with `gh` CLI available, you can look up issues:
+For looking up issues, prefer MCP tools when available (see Tool Discovery below), otherwise fall back to CLI:
 ```bash
 gh issue list --state open --limit 10     # recent open issues
 gh issue view 142                          # specific issue details
@@ -136,66 +136,41 @@ Scopes add context about **what area** of the codebase a commit affects. They ar
 
 When using scopes: never mix more than one scope in the same commit — if changes touch multiple packages or modules, create one commit per scope.
 
-### Scope Configuration
+### Scope Discovery
 
-Scopes can be defined explicitly or discovered automatically. The skill checks for configuration in this order:
+Scopes are inferred from the repository structure and context. No configuration file is needed.
 
-#### 1. Explicit Configuration (`.conventional-commits.json`)
+#### Sources (in priority order)
 
-If a `.conventional-commits.json` file exists at the repo root, use it as the source of truth for scopes:
+1. **Repo description** — `AGENTS.md`, `claude.md`, `copilot-instructions.md`, or similar files often list the project's modules and scopes. If scopes are documented there, use them directly. This is the recommended way to define scopes for a team — they're always in the agent's context.
+2. **Directory structure** — the scope name matches the directory name. This is the universal convention used by Nx, Lerna, Turborepo, and most monorepo tools:
+   - `packages/auth/` → `auth`
+   - `apps/web/` → `web`
+   - `src/database/` → `database`
+3. **User input** — the user specifies scopes in their prompt (e.g., "commit auth and api") or corrects a suggestion.
 
-```json
-{
-  "scopes": {
-    "auth": { "paths": ["src/auth/**", "packages/auth/**"] },
-    "api": { "paths": ["src/api/**", "packages/api/**"] },
-    "ui": { "paths": ["src/ui/**", "packages/ui/**"] },
-    "repo": { "paths": [".github/**", "*.json", "*.yml", "Dockerfile"] }
-  },
-  "requireScope": true,
-  "issueTracker": {
-    "type": "github"
-  }
-}
+#### Documenting Scopes in the Repo
+
+Encourage teams to add a scopes section to their `AGENTS.md` or `claude.md`. Example:
+
+```markdown
+## Commit Scopes
+
+| Scope | Path |
+|-------|------|
+| auth | packages/auth/ |
+| api | packages/api/ |
+| shared | packages/shared/ |
+| repo | root-level configs |
 ```
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `scopes` | `object` | — | Map of scope name → `{ paths: string[] }`. Paths use glob patterns relative to repo root. |
-| `requireScope` | `boolean` | `false` | If `true`, every commit must include a scope. If `false`, scopes are recommended but optional. |
-| `issueTracker` | `object` | `{ "type": "github" }` | Issue tracker configuration. See `references/issue-tracking.md` for all options. |
-| `issueTracker.type` | `string` | `"github"` | `"github"`, `"jira"`, or `"none"`. |
-| `issueTracker.jiraProjectKey` | `string` | — | Required when type is `"jira"`. The project key (e.g., `"PROJ"`). |
-| `issueTracker.jiraBaseUrl` | `string` | — | Optional Jira instance URL for generating links (e.g., `"https://mycompany.atlassian.net"`). |
+This way, scopes are version-controlled, visible to all agents, and require no separate config file.
 
-When this file exists, only the defined scopes are valid. If a modified file doesn't match any scope pattern, ask the user whether to add a new scope to the config or commit without scope.
-
-#### 2. Automatic Discovery (No Config File)
-
-When no config file exists, infer scopes from the repository structure:
-
-| Repository layout | Scope strategy |
-|---|---|
-| Monorepo with `packages/` | Each package directory → scope (e.g., `packages/auth/` → `auth`) |
-| Monorepo with `apps/` and `libs/` | Each app/lib directory → scope (e.g., `apps/web/` → `web`) |
-| Single-package with `src/` modules | Top-level feature directories → scope (e.g., `src/auth/` → `auth`) |
-| Simple/flat repo | Scope is optional; use module or file area if meaningful |
-| Root-level files | Use `repo`, `root`, or the project name |
-
-### Suggesting Scope Setup
-
-When committing for the first time in a repo without `.conventional-commits.json`, analyze the project structure and **offer to generate the config file**:
-
-1. Inspect the repo layout (`ls`, `find`, `package.json` workspaces field)
-2. Propose a scope map based on what you find
-3. Ask the user to confirm or adjust
-4. Write `.conventional-commits.json` if the user agrees
-
-This creates a shared convention for the team. For detailed scope strategy guidance by repo type, read `references/scope-strategy.md`.
+For detailed scope strategy guidance by repo type (monorepo, single-package, library, microservices), read `references/scope-strategy.md`.
 
 ### File-to-Scope Resolution
 
-Determine the scope from the file path. When a config file exists, match against the glob patterns. Otherwise, match the most specific directory:
+Determine the scope from the file path by matching the most specific directory name:
 
 **Monorepo:**
 ```
@@ -284,27 +259,20 @@ Parse the user's request to determine the mode and target scopes.
 
 ### Step 2: Analyze Changes
 
-Run the analysis script to get all changed files grouped by scope, with issue detection from the branch name:
+Run the analysis script to get the branch context and all changed files:
 
 ```bash
 bash <skill-path>/scripts/analyze-changes.sh
-# Or filter to specific scopes:
-bash <skill-path>/scripts/analyze-changes.sh --scope auth,api
 ```
 
-The script outputs JSON with:
-- `branch` — current branch name
-- `issueRef` — issue reference extracted from branch (e.g., `#142` or `PROJ-142`)
-- `issueTracker` — tracker type from config (`github`, `jira`, `none`)
-- `configFound` — whether `.conventional-commits.json` exists
-- `requireScope` — whether scopes are mandatory
-- `stagedFiles` — files already in the staging area
-- `scopeGroups` — files grouped by scope, each with `path` and `status` (staged/modified/untracked)
-- `totalFiles` — total number of changed files
+The script outputs one line per item, prefixed by type:
+- `BRANCH:<name>` — current branch
+- `ISSUE:<ref>\t<tracker>` — issue reference and tracker type (github/jira), extracted from branch name
+- `STAGED:<path>` — files already in the staging area
+- `MODIFIED:<path>` — tracked files with unstaged changes
+- `UNTRACKED:<path>` — new files not yet tracked
 
-If files are already staged (`stagedFiles` is non-empty), acknowledge them and ask the user whether to include them in the plan or reset them first.
-
-Then inspect the actual diffs to understand what changed (needed for type assignment and splitting):
+Use the file paths to determine scopes (from repo description, directory names, or user input). Then inspect the actual diffs to understand what changed:
 
 ```bash
 git diff --stat
@@ -408,6 +376,56 @@ When the user asks to "review", "check", "analyze", or "plan" commits without ac
 - Clearly state that no commits were made
 
 This lets the user review the strategy before committing.
+
+## Tool Discovery
+
+Before falling back to CLI commands, check if MCP tools are available in the current session. MCP servers for Git, GitHub, and Jira provide richer context and are often already configured in the user's environment.
+
+### Git Operations
+
+**Prefer MCP tools (if available):**
+- Git status, diff, blame, branch, log → look for MCP tools with names like `git_status`, `git_log_or_diff`, `git_blame`, `git_branch`, `git_add_or_commit`
+- These provide structured output without parsing CLI text
+
+**Fallback to CLI:**
+```bash
+git status
+git diff --stat
+git diff
+git branch --show-current
+git log --oneline -5
+```
+
+### Issue Lookup
+
+**Prefer MCP tools (if available):**
+- GitHub issues → look for MCP tools like `issues_get_detail`, `issues_assigned_to_me`
+- Jira issues → look for MCP tools with Jira/Atlassian in the name
+- Pull requests → look for MCP tools like `pull_request_get_detail`, `pull_request_create`
+
+**Fallback to CLI:**
+```bash
+# GitHub
+gh issue list --state open --limit 10
+gh issue view 142
+
+# Jira (if jira-cli is installed)
+jira issue view PROJ-142
+```
+
+### Committing
+
+**Prefer MCP tools (if available):**
+- Some MCP servers offer `git_add_or_commit` tools that can stage and commit in one step
+
+**Fallback to CLI (recommended for fine-grained control):**
+```bash
+git add <file>
+git add -p <file>    # for partial staging
+git commit -m "type(scope): subject"
+```
+
+Use `tool_search` at the start of the workflow to discover what's available. If MCP tools exist, use them; if not, CLI works perfectly fine.
 
 ## Edge Cases
 

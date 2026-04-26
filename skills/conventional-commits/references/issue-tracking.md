@@ -8,25 +8,18 @@ How to link commits and PRs to issues from different trackers. This reference co
 2. [Jira Integration](#jira-integration)
 3. [Branch Naming Conventions](#branch-naming-conventions)
 4. [PR Description Templates](#pr-description-templates)
-5. [Config Examples](#config-examples)
-6. [Workflow: From Issue to PR](#workflow-from-issue-to-pr)
+5. [Workflow: From Issue to PR](#workflow-from-issue-to-pr)
 
 ---
 
 ## GitHub Issues
 
-### Setup
+### Detection
 
-GitHub Issues require no additional setup — references like `#123` are automatically linked by GitHub.
-
-**Config:**
-```json
-{
-  "issueTracker": {
-    "type": "github"
-  }
-}
-```
+GitHub Issues are the default. The skill detects GitHub when:
+- The branch name contains a plain number after the prefix (e.g., `feature/142-oauth-pkce`)
+- The repo is hosted on GitHub (detected via `git remote -v`)
+- No Jira-style key (`LETTERS-DIGITS`) is found in the branch name
 
 ### Reference Syntax in Commits
 
@@ -50,7 +43,17 @@ Closes: #73, #81
 Refs: org/other-repo#42
 ```
 
-### Using `gh` CLI
+### Using MCP Tools (Preferred)
+
+If MCP tools for GitHub are available in the session, prefer them over CLI:
+
+- **List issues:** look for tools like `issues_assigned_to_me`, `issues_get_detail`
+- **View issue details:** look for `issues_get_detail` with the issue number
+- **Pull requests:** look for `pull_request_create`, `pull_request_get_detail`
+
+MCP tools provide structured output and don't require CLI installation.
+
+### Using `gh` CLI (Fallback)
 
 The GitHub CLI is the fastest way to look up and manage issues during the commit workflow.
 
@@ -96,20 +99,9 @@ git branch --show-current
 
 ## Jira Integration
 
-### Setup
+### Detection
 
-Jira requires knowing the project key and optionally the instance URL.
-
-**Config:**
-```json
-{
-  "issueTracker": {
-    "type": "jira",
-    "jiraProjectKey": "PROJ",
-    "jiraBaseUrl": "https://mycompany.atlassian.net"
-  }
-}
-```
+Jira is detected when the branch name contains a key matching the `LETTERS-DIGITS` pattern (e.g., `feature/PROJ-142-oauth-pkce`). The project key is extracted automatically from the branch name.
 
 ### Reference Syntax in Commits
 
@@ -134,9 +126,11 @@ Jira doesn't auto-close issues from commit messages by default. Automation depen
 
 ### Looking Up Jira Issues
 
-There's no official Jira CLI as mature as `gh`, but several options exist:
+**Option 1: MCP tools (preferred)**
 
-**Option 1: Jira REST API via curl**
+If MCP tools for Jira/Atlassian are available in the session, use them directly. Look for tools with Jira or Atlassian in the name for querying issues, getting details, and adding comments.
+
+**Option 2: Jira REST API via curl**
 ```bash
 # Requires a personal access token or API token
 export JIRA_BASE="https://mycompany.atlassian.net"
@@ -153,7 +147,7 @@ curl -s -u "$JIRA_EMAIL:$JIRA_TOKEN" \
   | jq '.issues[] | {key, summary: .fields.summary, status: .fields.status.name}'
 ```
 
-**Option 2: `jira-cli` (go-jira)**
+**Option 3: `jira-cli` (go-jira)**
 ```bash
 # Install
 brew install ankitpokhrel/jira-cli/jira-cli
@@ -168,7 +162,7 @@ jira issue list -a "$(jira me)" -s "In Progress" -s "To Do"
 jira issue view PROJ-142
 ```
 
-**Option 3: Parse from branch name**
+**Option 4: Parse from branch name**
 Most teams adopt branch naming that includes the Jira key:
 ```bash
 git branch --show-current
@@ -178,7 +172,7 @@ git branch --show-current
 
 ### Extracting Issue Key from Branch Name
 
-When `issueTracker.type` is `"jira"`, extract the issue key using this pattern:
+For Jira projects, extract the issue key using this pattern:
 
 ```bash
 # Extract Jira key from branch name
@@ -187,7 +181,7 @@ git branch --show-current | grep -oE '[A-Z]+-[0-9]+'
 # bugfix/PROJ-73-null-pointer  → PROJ-73
 ```
 
-When `issueTracker.type` is `"github"`, extract the issue number (first number after the prefix):
+For GitHub projects, extract the issue number (first number after the prefix):
 
 ```bash
 # Extract GitHub issue number from branch name
@@ -333,41 +327,6 @@ gh pr create --recover 142
 # If using a template
 gh pr create --fill
 ```
-
----
-
-## Config Examples
-
-### GitHub (default, minimal)
-```json
-{
-  "issueTracker": {
-    "type": "github"
-  }
-}
-```
-
-### Jira
-```json
-{
-  "issueTracker": {
-    "type": "jira",
-    "jiraProjectKey": "PROJ",
-    "jiraBaseUrl": "https://mycompany.atlassian.net"
-  }
-}
-```
-
-### No issue tracking
-```json
-{
-  "issueTracker": {
-    "type": "none"
-  }
-}
-```
-
-When type is `"none"`, the skill won't suggest issue references in footers or PR descriptions.
 
 ---
 

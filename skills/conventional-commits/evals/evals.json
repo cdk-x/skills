@@ -40,13 +40,13 @@
     {
       "id": 7,
       "prompt": "I have a small personal project with just 3 files, I changed utils.ts and index.ts. Can you commit?",
-      "expected_output": "Should NOT force scopes on a simple repo. Should commit without scope or with a minimal scope. Should not suggest creating .conventional-commits.json unless asked. Format: 'fix: description' or 'feat: description' is acceptable.",
+      "expected_output": "Should NOT force scopes on a simple repo. Should commit without scope or with a minimal scope. Format: 'fix: description' or 'feat: description' is acceptable.",
       "files": []
     },
     {
       "id": 8,
       "prompt": "I want to set up commit scopes for my monorepo that uses pnpm workspaces with packages/auth, packages/api, and packages/shared",
-      "expected_output": "Should analyze the repo structure, propose a .conventional-commits.json with scopes matching the packages, suggest requireScope: true for a monorepo, and ask the user to confirm before writing the file.",
+      "expected_output": "Should explain that scopes are auto-discovered from directory names (auth, api, shared). Should suggest documenting them in the repo's AGENTS.md or claude.md so they're always in context. Should not create any config file.",
       "files": []
     },
     {
@@ -64,7 +64,7 @@
     {
       "id": 11,
       "prompt": "We use Jira with project key MYAPP. I want to set up issue tracking for our commits and PRs.",
-      "expected_output": "Should propose adding issueTracker config to .conventional-commits.json with type 'jira' and jiraProjectKey 'MYAPP'. Should ask for the Jira base URL. Should explain branch naming convention (feat/MYAPP-123-description) and how to reference issues in footers (Refs: MYAPP-123).",
+      "expected_output": "Should explain that Jira issues are detected automatically from branch names containing the MYAPP-XXX pattern. Should explain the branch naming convention (feature/MYAPP-123-description) and how to reference issues in footers (Refs: MYAPP-123). Should check for available MCP tools for Jira and mention them if present.",
       "files": []
     }
   ]

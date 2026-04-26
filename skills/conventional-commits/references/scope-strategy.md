@@ -1,6 +1,8 @@
 # Scope Strategy Guide
 
-Detailed guidance for choosing and configuring scopes based on repository type. This reference is loaded on demand when the user needs help setting up scopes or when the skill suggests generating a `.conventional-commits.json` config.
+Detailed guidance for choosing scopes based on repository type. This reference is loaded on demand when the agent needs help mapping files to scopes.
+
+Scopes come from three sources: the repo description (`AGENTS.md` / `claude.md`), directory names, or the user. This guide helps when none of those are clear.
 
 ## Table of Contents
 
@@ -11,7 +13,6 @@ Detailed guidance for choosing and configuring scopes based on repository type. 
 5. [Microservices Repo](#microservices-repo)
 6. [Simple / Small Repo](#simple--small-repo)
 7. [Scope Naming Conventions](#scope-naming-conventions)
-8. [Config File Examples](#config-file-examples)
 
 ---
 
@@ -32,21 +33,9 @@ my-monorepo/
 └── .github/           → scope: repo (or ci)
 ```
 
-**Config:**
-```json
-{
-  "scopes": {
-    "auth": { "paths": ["packages/auth/**"] },
-    "api": { "paths": ["packages/api/**"] },
-    "shared": { "paths": ["packages/shared/**"] },
-    "ui": { "paths": ["packages/ui/**"] },
-    "repo": { "paths": [".github/**", "*.json", "*.yml", "*.yaml", "*.md"] }
-  },
-  "requireScope": true
-}
-```
+**Auto-discovery:** The script detects `packages/` and maps each subdirectory to a scope. Root-level files get scope `repo`.
 
-**Why `requireScope: true`:** In a monorepo, scopes are essential for understanding which package a commit affects. Without them, changelogs and `git log --grep` become much less useful.
+**Why scopes matter here:** In a monorepo, scopes are essential for understanding which package a commit affects. Without them, changelogs and `git log --grep` become much less useful.
 
 ---
 
@@ -95,22 +84,9 @@ my-app/
 └── Dockerfile         → scope: repo (or docker)
 ```
 
-**Config:**
-```json
-{
-  "scopes": {
-    "auth": { "paths": ["src/auth/**"] },
-    "payments": { "paths": ["src/payments/**"] },
-    "users": { "paths": ["src/users/**"] },
-    "database": { "paths": ["src/database/**"] },
-    "middleware": { "paths": ["src/middleware/**"] },
-    "repo": { "paths": ["*.json", "*.yml", "Dockerfile", ".github/**"] }
-  },
-  "requireScope": false
-}
-```
+**Auto-discovery:** The script detects `src/` subdirectories as scopes. Root-level files get scope `repo`.
 
-**Why `requireScope: false`:** Single-package apps often have cross-cutting changes (e.g., a migration that touches `database/` and `users/`). Making scope optional reduces friction for small changes while keeping the convention for larger ones.
+**Tip:** Single-package apps often have cross-cutting changes (e.g., a migration that touches `database/` and `users/`). In those cases, omit the scope or split the commit — both are fine.
 
 ---
 
@@ -188,43 +164,3 @@ feat(ui): add dark mode toggle
 | Match the directory name | `api` (for `packages/api/`) | `backend` (when dir is `api/`) |
 | Avoid generic names | `payments`, `billing` | `module1`, `feature` |
 | Consistent depth | All scopes at same level | Mix of `auth` and `auth-login-oauth` |
-
----
-
-## Config File Examples
-
-### Minimal (small project)
-```json
-{
-  "requireScope": false
-}
-```
-
-### Standard monorepo
-```json
-{
-  "scopes": {
-    "core": { "paths": ["packages/core/**"] },
-    "cli": { "paths": ["packages/cli/**"] },
-    "api": { "paths": ["packages/api/**"] },
-    "repo": { "paths": [".github/**", "*.json", "*.yml"] }
-  },
-  "requireScope": true
-}
-```
-
-### Application with nested providers
-```json
-{
-  "scopes": {
-    "auth": { "paths": ["src/auth/**"] },
-    "api": { "paths": ["src/api/**"] },
-    "db": { "paths": ["src/database/**", "migrations/**"] },
-    "aws": { "paths": ["src/providers/aws/**"] },
-    "gcp": { "paths": ["src/providers/gcp/**"] },
-    "infra": { "paths": ["terraform/**", "docker/**", "Dockerfile"] },
-    "repo": { "paths": [".github/**", "package.json", "tsconfig*.json"] }
-  },
-  "requireScope": true
-}
-```
