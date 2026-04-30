@@ -10,6 +10,7 @@ skills/
 ├── conventional-commits/   → Atomic commits with Conventional Commits format
 ├── plan/                   → Technical plan generation from specs
 ├── prd/                    → Product Requirements Document generation and publishing
+├── prd-to-issues/          → Break a PRD into GitHub Issues or Jira Stories+Tasks
 └── (future skills)
 ```
 
@@ -23,6 +24,7 @@ Skills are symlinked into consuming repos via `.agents/skills/` or `.claude/skil
 | `conventional-commits` | `skills/conventional-commits/` | The conventional commits skill |
 | `plan` | `skills/plan/` | The technical plan skill |
 | `prd` | `skills/prd/` | The PRD skill |
+| `prd-to-issues` | `skills/prd-to-issues/` | The PRD-to-issues skill |
 | `repo` | root-level files | Repository config, CI, docs |
 
 As new skills are added, register them here as scopes.
