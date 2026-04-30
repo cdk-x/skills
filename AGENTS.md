@@ -6,6 +6,7 @@ Shared collection of agent skills for the cdk-x organization. Each skill is a se
 
 ```
 skills/
+├── analyze/                → Consistency analysis across spec and plan artifacts
 ├── conventional-commits/   → Atomic commits with Conventional Commits format
 ├── plan/                   → Technical plan generation from specs
 ├── prd/                    → Product Requirements Document generation and publishing
@@ -18,6 +19,7 @@ Skills are symlinked into consuming repos via `.agents/skills/` or `.claude/skil
 
 | Scope | Path | Description |
 |-------|------|-------------|
+| `analyze` | `skills/analyze/` | The consistency analysis skill |
 | `conventional-commits` | `skills/conventional-commits/` | The conventional commits skill |
 | `plan` | `skills/plan/` | The technical plan skill |
 | `prd` | `skills/prd/` | The PRD skill |
