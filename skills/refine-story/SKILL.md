@@ -18,11 +18,11 @@ description: >
 
 Lead a full refinement session for a user story on the Discovery Board. Analyzes Functional and Non-Functional Requirements, enriches existing acceptance criteria, sets Risk and Estimate fields, and transitions the story through the refinement workflow.
 
-> **GitHub model:** Stories on the Discovery Board are **GitHub Project items** (draft issues).
-> They have no backing repository issue. Never use `gh issue view`, `gh issue list`,
-> `gh issue edit`, or `gh issue comment`. All reads and writes go through `gh project`
-> CLI or the GraphQL API. Refinement session notes are appended to the item body (not as
-> comments, since draft issues do not support them).
+> **GitHub model:** Stories on the Discovery Board are **real GitHub Issues** in a private backing
+> repository, tracked via the GitHub Project. The backing repository is private so stories are never
+> visible in any public repo. Use `gh issue view/edit/comment` (with `--repo`) for content operations,
+> and GraphQL for project field mutations. Resolve the backing repository from `AGENTS.md` / `CLAUDE.md`
+> alongside the project number.
 
 **Board transitions handled by this skill:**
 
@@ -232,11 +232,9 @@ Once the user approves, update the story via `updateProjectV2DraftIssue` (see `r
 
 1. **Rewrite the item body** using `assets/refined-story-template.md` — fill in User Story sentence (original), FRs, NFRs, enriched ACs, and Epic SC coverage.
 
-2. **Append a refinement session block** at the end of the body (after a `---` separator) — decisions and context only. Do NOT include Risk, Estimate, Value, or Size — those are project fields, not body content. Draft issues do not support comments; the body is the only place to record session history:
+2. **Add a refinement session comment** — decisions and context only. Do NOT include Risk, Estimate, Value, or Size — those are project fields, not comment content:
 
-   ```markdown
-   ---
-
+   ```
    ## Refinement Session — <date>
 
    **Functional Requirements identified**: FR-1, FR-2, ...
@@ -246,7 +244,7 @@ Once the user approves, update the story via `updateProjectV2DraftIssue` (see `r
    **Open questions**: <unresolved questions, or "None">
    ```
 
-3. **Ask the user**: _"Do you want to add any notes from the team's discussion to this session block before closing?"_ — incorporate their input.
+3. **Ask the user**: _"Do you want to add any notes from the team's discussion to this comment before closing the session?"_ — incorporate their input.
 
 ---
 

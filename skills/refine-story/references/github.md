@@ -1,20 +1,25 @@
 # GitHub — Refine Story
 
-Stories operated on by this skill are **GitHub Project items** (draft issues). They have no
-backing repository issue. Never use `gh issue view`, `gh issue edit`, or `gh issue comment`.
-All reads and writes go through `gh project` CLI or the GraphQL API.
+Stories on the Discovery Board are **real GitHub Issues** in a private backing repository,
+tracked via the GitHub Project. Use standard `gh issue` commands (with `--repo`) for all
+content operations, and GraphQL for project field mutations.
 
 ---
 
-## Resolving the GitHub Project
+## Resolving the GitHub Project and backing repository
 
-Check `AGENTS.md` / `CLAUDE.md` for a configured project name/number and owner, or ask once:
+Check `AGENTS.md` / `CLAUDE.md` for:
+- Project number/name and owner
+- Private backing repository (keys like `GitHub Repository`, `backing repo`, `project repo`)
+
+If not found, list and ask:
 
 ```bash
-gh project list --owner <org-or-user>
+gh project list --owner <org-or-user> --format json | jq '.projects[] | select(.number==<project_id>)'
 ```
 
-Record the **project number**, **owner**, and **project node ID** — reused in every mutation.
+Record the **project number**, **owner**, **project node ID**, and **backing repository** —
+reused in every command.
 
 ---
 
@@ -64,12 +69,7 @@ Fields needed for this skill:
 
 ## Listing stories available for refinement
 
-```bash
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '[.items[] | select(.status == "Ready for Refinement")]'
-```
-
-To filter by status via GraphQL (more precise):
+Filter by `Status = Ready for Refinement` via GraphQL:
 
 ```bash
 gh api graphql -f query='
@@ -80,7 +80,7 @@ query($owner: String!, $number: Int!) {
         nodes {
           id
           content {
-            ... on DraftIssue { title body }
+            ... on Issue { number title url }
           }
           fieldValues(first: 20) {
             nodes {
@@ -100,45 +100,32 @@ query($owner: String!, $number: Int!) {
 
 ---
 
-## Fetching a project item's full content
+## Fetching a story's full content
 
 ```bash
-gh api graphql -f query='
-query($id: ID!) {
-  node(id: $id) {
-    ... on ProjectV2Item {
-      id
-      content {
-        ... on DraftIssue {
-          id
-          title
-          body
-        }
-      }
-      fieldValues(first: 20) {
-        nodes {
-          ... on ProjectV2ItemFieldSingleSelectValue {
-            name
-            field { ... on ProjectV2SingleSelectField { name } }
-          }
-          ... on ProjectV2ItemFieldNumberValue {
-            number
-            field { ... on ProjectV2Field { name } }
-          }
-          ... on ProjectV2ItemFieldTextValue {
-            text
-            field { ... on ProjectV2Field { name } }
-          }
-        }
-      }
-    }
-  }
-}' -f id="<project-item-id>"
+gh issue view <number> \
+  --repo <owner/repo> \
+  --json number,title,body,comments,url,parent
 ```
 
-This returns both:
-- `content.id` — the **Draft Issue ID** (used in `updateProjectV2DraftIssue`)
-- `id` — the **Project Item ID** (used in `updateProjectV2ItemFieldValue`)
+Read all comments — they may contain prior refinement decisions or open questions.
+
+---
+
+## Getting the project item ID for an issue
+
+Needed for field mutations. Add the issue to the project (idempotent — returns existing item if already there):
+
+```bash
+ITEM_ID=$(gh api graphql -f query='
+mutation($project: ID!, $content: ID!) {
+  addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+    item { id }
+  }
+}' -f project="<project-id>" \
+   -f content="$(gh issue view <number> --repo <owner/repo> --json id --jq '.id')" \
+   --jq '.data.addProjectV2ItemById.item.id')
+```
 
 ---
 
@@ -157,16 +144,16 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
   }
 }' \
   -f project="<project-id>" \
-  -f item="<project-item-id>" \
+  -f item="<item-id>" \
   -f field="<status-field-id>" \
   -f option="<in-refinement-option-id>"
 ```
 
-Replace `<in-refinement-option-id>` with `<ready-for-implementation-option-id>` for the final transition.
+Replace with `<ready-for-implementation-option-id>` for the final transition.
 
 ---
 
-## Setting the Size field (single-select)
+## Setting the Size field
 
 ```bash
 gh api graphql -f query='
@@ -181,7 +168,7 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
   }
 }' \
   -f project="<project-id>" \
-  -f item="<project-item-id>" \
+  -f item="<item-id>" \
   -f field="<size-field-id>" \
   -f option="<S|M|L-option-id>"
 ```
@@ -189,8 +176,6 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
 ---
 
 ## Setting the Risk field (text: L / M / H)
-
-Risk is a **text** field — use `{ text: "..." }`, not `singleSelectOptionId`:
 
 ```bash
 gh api graphql -f query='
@@ -205,9 +190,9 @@ mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
   }
 }' \
   -f project="<project-id>" \
-  -f item="<project-item-id>" \
+  -f item="<item-id>" \
   -f field="<risk-field-id>" \
-  -f value="M"   # or "L" or "H"
+  -f value="M"
 ```
 
 ---
@@ -227,76 +212,53 @@ mutation($project: ID!, $item: ID!, $field: ID!, $value: Float!) {
   }
 }' \
   -f project="<project-id>" \
-  -f item="<project-item-id>" \
+  -f item="<item-id>" \
   -f field="<field-id>" \
   -F value=<number>
 ```
 
-- **Estimate**: Fibonacci value (1, 2, 3, 5, 8, 13)
-- **Value**: business value as configured in the project
-
-> If Estimate or Value is a SingleSelect field instead of numeric, use `singleSelectOptionId`.
-
 ---
 
-## Updating the story body (rewrite after refinement)
-
-Draft items do not support comments. All session context (refinement notes, decisions, open
-questions) must be incorporated into the item body itself.
-
-### Step 1 — Get the draft issue ID
+## Updating the story body after refinement
 
 ```bash
-DRAFT_ID=$(gh api graphql -f query='
-query($id: ID!) {
-  node(id: $id) {
-    ... on ProjectV2Item {
-      content {
-        ... on DraftIssue { id }
-      }
-    }
-  }
-}' -f id="<project-item-id>" --jq '.data.node.content.id')
+gh issue edit <number> \
+  --repo <owner/repo> \
+  --body "$(cat <<'EOF'
+<full refined body from assets/refined-story-template.md>
+EOF
+)"
 ```
 
-### Step 2 — Rewrite the body
-
-```bash
-gh api graphql -f query='
-mutation($draftId: ID!, $body: String!) {
-  updateProjectV2DraftIssue(input: {
-    draftIssueId: $draftId
-    body: $body
-  }) {
-    draftIssue { id }
-  }
-}' -f draftId="$DRAFT_ID" -f body="$(cat <<'EOF'
-<full refined body from assets/refined-story-template.md>
-
 ---
 
+## Adding the refinement session comment
+
+```bash
+gh issue comment <number> \
+  --repo <owner/repo> \
+  --body "$(cat <<'EOF'
 ## Refinement Session — <date>
 
 **Functional Requirements identified**: FR-1, FR-2, ...
 **Non-Functional Requirements**: <description, or "None story-specific">
 
-**Decisions**: <key decisions>
+**Decisions**: <key decisions made during the session>
 **Open questions**: <unresolved questions, or "None">
 EOF
 )"
 ```
 
-The refinement session block is **appended inside the body** (after a `---` separator) because
-draft issues do not support comments.
-
 ---
 
-## Searching for the DoD and DoR project items
+## Searching for the DoD and DoR issues
 
 ```bash
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '.items[] | select(.title == "Definition of Done")'
+gh issue list --repo <owner/repo> \
+  --search "Definition of Done in:title" \
+  --json number,title,url,state --limit 1
 
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '.items[] | select(.title == "Definition of Ready")'
+gh issue list --repo <owner/repo> \
+  --search "Definition of Ready in:title" \
+  --json number,title,url,state --limit 1
 ```
