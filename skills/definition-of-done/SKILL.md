@@ -1,9 +1,9 @@
 ---
 name: definition-of-done
 description: >
-  Create or update a GitHub Issue of type 'docs' in the project as the team's
-  living Definition of Done (DoD) reference checklist. This docs issue is
-  consulted by /refine-story during NFR analysis to identify which non-functional
+  Create or update a GitHub Project item of type 'docs' as the team's living
+  Definition of Done (DoD) reference checklist. This project item is consulted
+  by /refine-story during NFR analysis to identify which non-functional
   requirements are already covered globally. Trigger when the user says
   "/definition-of-done", "create definition of done", "set up DoD", "update
   our definition of done", "what is our DoD", or any variation of managing the
@@ -12,26 +12,49 @@ description: >
 
 # /definition-of-done — Definition of Done
 
-Create or update the team's **Definition of Done** as a GitHub Issue of type `docs` in the project. This issue serves as the team's shared reference — consulted during refinement to determine which non-functional requirements are already covered globally and do not need individual acceptance criteria on every story.
+Create or update the team's **Definition of Done** as a **GitHub Project item** (draft issue)
+of type `docs`. This item serves as the team's shared reference — consulted during refinement
+to determine which non-functional requirements are already covered globally and do not need
+individual acceptance criteria on every story.
 
-## Step 0 — Check for an existing DoD issue
+> **GitHub model:** Items created by this skill are **GitHub Project items** (draft issues).
+> They live exclusively in the GitHub Project — there is no backing repository issue.
+> Use `gh project item-create` to create them and GraphQL to update them.
+> Never use `gh issue create`, `gh issue list`, `gh issue edit`, or `gh issue comment`.
 
-Search the repo for an existing DoD docs issue:
+## Step 0 — Resolve the GitHub Project
 
-```bash
-gh issue list --search "Definition of Done in:title" --json number,title,url,state
-```
+Resolve before any operation:
 
-- If one exists (open or closed): show it to the user and ask:
-  - _"A Definition of Done issue already exists (#N). Do you want to update it, view it, or create a new one?"_
-  - **Update** → jump to Step 1 with the existing content pre-loaded
-  - **View** → print the URL and stop
-  - **Create new** → continue to Step 1 (the old issue will remain open; inform the user)
-- If none exists: continue to Step 1.
+1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
+2. If not found, list available projects and ask:
+   ```bash
+   gh project list --owner <org-or-user>
+   ```
+
+Read `references/github.md` for the exact commands.
 
 ---
 
-## Step 1 — Compose the DoD checklist
+## Step 1 — Check for an existing DoD item
+
+Search for an existing DoD project item:
+
+```bash
+gh project item-list <project-number> --owner <org-or-user> --format json \
+  | jq '.items[] | select(.title == "Definition of Done")'
+```
+
+- If one exists: show it to the user and ask:
+  - _"A Definition of Done item already exists. Do you want to update it, view it, or create a new one?"_
+  - **Update** → jump to Step 2 with the existing content pre-loaded; use `updateProjectV2DraftIssue`
+  - **View** → print the item ID and stop
+  - **Create new** → continue to Step 2 (the old item will remain; inform the user)
+- If none exists: continue to Step 2.
+
+---
+
+## Step 2 — Compose the DoD checklist
 
 Start from the base content in `docs/definition-of-done.md`. Present the full proposed checklist to the user:
 
@@ -69,47 +92,38 @@ Start from the base content in `docs/definition-of-done.md`. Present the full pr
 ```
 
 Ask the user:
-- _"Does this checklist reflect your team's Definition of Done? Add, remove, or modify any items before we create the issue."_
+- _"Does this checklist reflect your team's Definition of Done? Add, remove, or modify any items before we create the project item."_
 
 Iterate until the user approves the checklist.
 
 ---
 
-## Step 2 — Create or update the GitHub Issue
-
-Resolve which GitHub Project to use following the same approach as `user-story` (check `AGENTS.md` / `CLAUDE.md`, or ask once).
+## Step 3 — Create or update the project item
 
 Read `references/github.md` for the exact commands.
 
-**If creating a new issue:**
-1. Create the issue with title `Definition of Done` and the approved checklist as the body.
-2. Add the issue to the GitHub Project.
-3. Set `Type = docs`.
+**If creating a new item:**
+1. Create the project item with `gh project item-create`.
+2. Set `Type = docs` on the item via `updateProjectV2ItemFieldValue`.
 
-**If updating an existing issue:**
-1. Edit the issue body with the updated checklist:
-   ```bash
-   gh issue edit <number> --body "<updated content>"
-   ```
-2. Add a comment noting the update:
-   ```
-   DoD updated on <date>. Changes: <brief summary of what changed>.
-   ```
+**If updating an existing item:**
+1. Get the draft issue ID from the project item.
+2. Update the body via `updateProjectV2DraftIssue`.
 
 ---
 
-## Step 3 — Report
+## Step 4 — Report
 
 Tell the user:
-- The URL of the created/updated issue.
-- That `/refine-story` will consult this issue during NFR analysis to avoid writing acceptance criteria for requirements already covered globally.
+- The project item ID of the created/updated item.
+- That `/refine-story` will consult this item during NFR analysis to avoid writing acceptance criteria for requirements already covered globally.
 - Suggest running `/definition-of-ready` next if the team's DoR has not been set up yet.
 
 ---
 
 ## Rules
 
-- Do not create the issue until the user approves the checklist in Step 1.
-- The issue title must be exactly `Definition of Done` — no suffixes.
-- If the user asks to view the current DoD only, print the issue URL and stop — do not propose changes.
+- Do not create the item until the user approves the checklist in Step 2.
+- The item title must be exactly `Definition of Done` — no suffixes.
+- If the user asks to view the current DoD only, print the item ID and stop — do not propose changes.
 - Non-functional requirements that appear in the DoD (e.g., "Unit test coverage > 80%") are considered globally covered — `/refine-story` will not generate individual ACs for them on each story.
