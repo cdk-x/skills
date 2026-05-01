@@ -1,14 +1,25 @@
-# GitHub — Definition of Ready docs issue
+# GitHub — Definition of Ready project item
 
-The commands here are identical to those in `definition-of-done/references/github.md` — only the issue title and content differ. Refer to that file for full GraphQL query details.
+Items created by this skill are **GitHub Project items** (draft issues). They live exclusively
+in the GitHub Project — there is no backing repository issue. Never use `gh issue create`,
+`gh issue edit`, `gh issue list`, or `gh issue comment` for these items.
+
+The commands here are identical in structure to `definition-of-done/references/github.md` —
+only the item title and content differ. Refer to that file for full GraphQL query details.
+
+---
 
 ## Resolving the GitHub Project
 
-```bash
-gh project list --owner <org-or-user>
-```
+Resolve before any operation:
 
-Check `AGENTS.md` / `CLAUDE.md` first for a configured project name or number.
+1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
+2. If not found, list available projects and ask:
+   ```bash
+   gh project list --owner <org-or-user>
+   ```
+
+Record the **project number** and **owner**.
 
 ---
 
@@ -25,10 +36,7 @@ query($owner: String!, $number: Int!) {
           ... on ProjectV2SingleSelectField {
             id
             name
-            options {
-              id
-              name
-            }
+            options { id name }
           }
         }
       }
@@ -43,35 +51,34 @@ Record:
 
 ---
 
-## Creating the docs issue
+## Searching for an existing DoR item
 
 ```bash
-ISSUE_URL=$(gh issue create \
-  --title "Definition of Ready" \
-  --body "$(cat <<'EOF'
-<checklist content approved by user>
-EOF
-)")
-echo $ISSUE_URL
+gh project item-list <project-number> --owner <org-or-user> --format json \
+  | jq '.items[] | select(.title == "Definition of Ready")'
 ```
 
 ---
 
-## Adding to project and setting Type = docs
+## Creating the project item
 
 ```bash
-# Get node ID
-gh issue view <number> --json id --jq '.id'
+ITEM_DATA=$(gh project item-create <project-number> \
+  --owner <org-or-user> \
+  --title "Definition of Ready" \
+  --body "$(cat <<'EOF'
+<checklist content approved by user>
+EOF
+)" --format json)
 
-# Add to project
-ITEM_ID=$(gh api graphql -f query='
-mutation($project: ID!, $content: ID!) {
-  addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
-    item { id }
-  }
-}' -f project="<project-id>" -f content="<issue-node-id>" --jq '.data.addProjectV2ItemById.item.id')
+ITEM_ID=$(echo "$ITEM_DATA" | jq -r '.id')
+```
 
-# Set Type = docs
+---
+
+## Setting Type = docs
+
+```bash
 gh api graphql -f query='
 mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
   updateProjectV2ItemFieldValue(input: {
@@ -91,17 +98,33 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
 
 ---
 
-## Updating an existing issue
+## Updating an existing item's body
+
+### Step 1 — Get the draft issue ID
 
 ```bash
-gh issue edit <number> --body "<updated checklist>"
-gh issue comment <number> --body "DoR updated on <date>. Changes: <summary>."
+DRAFT_ID=$(gh api graphql -f query='
+query($id: ID!) {
+  node(id: $id) {
+    ... on ProjectV2Item {
+      content {
+        ... on DraftIssue { id }
+      }
+    }
+  }
+}' -f id="$ITEM_ID" --jq '.data.node.content.id')
 ```
 
----
-
-## Searching for an existing DoR issue
+### Step 2 — Update body
 
 ```bash
-gh issue list --search "Definition of Ready in:title" --json number,title,url,state
+gh api graphql -f query='
+mutation($draftId: ID!, $body: String!) {
+  updateProjectV2DraftIssue(input: {
+    draftIssueId: $draftId
+    body: $body
+  }) {
+    draftIssue { id }
+  }
+}' -f draftId="$DRAFT_ID" -f body="<updated checklist>"
 ```
