@@ -1,36 +1,20 @@
-# GitHub — Create User Story project items
+# GitHub — Create User Story issues
 
-Items created by this skill are **GitHub Project items** (draft issues). They live exclusively
-in the GitHub Project — there is no backing repository issue. Never use `gh issue create`,
-`gh issue edit`, or `gh issue list`. All operations go through `gh project` CLI or the GraphQL API.
+Items created by this skill are **real GitHub Issues** in a private backing repository,
+added to the GitHub Project. This keeps project management details invisible in any public
+repository while giving full issue functionality (open/closed state, comments, sub-issues).
 
 ---
 
 ## Fetching the PRD
 
-### From a GitHub project item
-
-If the PRD is itself a project item, fetch it via GraphQL:
+### From a GitHub issue
 
 ```bash
-gh api graphql -f query='
-query($id: ID!) {
-  node(id: $id) {
-    ... on ProjectV2Item {
-      content {
-        ... on DraftIssue { title body }
-      }
-    }
-  }
-}' -f id="<prd-item-id>"
+gh issue view <number> --repo <owner/repo> --json title,body,comments
 ```
 
-Or list project items and find it by title:
-
-```bash
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '.items[] | select(.title | test("<prd title>"; "i"))'
-```
+Read comments too — they may contain clarifications that affect scope.
 
 ### From Confluence
 
@@ -57,23 +41,26 @@ mcp__atlassian__getConfluencePage { pageId: "<id>" }
 
 ---
 
-## Resolving the GitHub Project
+## Resolving the GitHub Project and backing repository
 
-Resolve before any operation:
+Resolve both before any operation:
 
-1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
+1. Check `AGENTS.md` and `CLAUDE.md` for:
+   - Project number/name and owner (keys like `GitHub Project`, `project number`)
+   - Private backing repository (keys like `GitHub Repository`, `backing repo`, `project repo`)
 2. If not found, list available projects and ask:
    ```bash
-   gh project list --owner <org-or-user>
+   gh project list --owner <org-or-user> --format json | jq '.projects[] | select(.number==<project_id>)'
    ```
 
-Record the **project number** and **owner** — every command in this skill uses them.
+Record the **project number**, **owner**, and **backing repository** (`<owner/repo>`) —
+all three are used in every command in this skill.
 
 ---
 
 ## Resolving project field IDs
 
-Fetch once per session. Record all field IDs and option IDs — reuse for every item created.
+Fetch once per session. Record all field IDs and option IDs — reuse for every issue created.
 
 ```bash
 gh api graphql -f query='
@@ -108,29 +95,39 @@ query($owner: String!, $number: Int!) {
 
 > If the project belongs to a user (not an org), replace `organization` with `user`.
 
-Record these IDs — reuse them for every item created in this session:
+Record:
 - Project ID (`projectV2.id`)
 - Type field ID + option IDs for `Epic` and `User Story`
 - Size field ID + option IDs for `Small`, `Medium`, `Large`
 
 ---
 
-## Creating a project item (Epic or User Story)
+## Creating an issue and adding it to the project
 
 ```bash
-ITEM_DATA=$(gh project item-create <project-number> \
-  --owner <org-or-user> \
+# Step 1 — Create the issue in the private backing repository
+ISSUE_URL=$(gh issue create \
+  --repo <owner/repo> \
   --title "<short descriptive title>" \
   --body "$(cat <<'EOF'
 <template content, filled in from assets/user-story-template.md>
 EOF
-)" --format json)
+)")
+ISSUE_NUMBER="${ISSUE_URL##*/}"
 
-ITEM_ID=$(echo "$ITEM_DATA" | jq -r '.id')
-echo "Item ID: $ITEM_ID"
+# Step 2 — Add to the project
+ITEM_ID=$(gh project item-add <project-number> \
+  --owner <org-or-user> \
+  --url "$ISSUE_URL" \
+  --format json | jq -r '.id')
+echo "Issue #$ISSUE_NUMBER  |  Item ID: $ITEM_ID"
 ```
 
-`ITEM_ID` is the project item node ID — use it for all field mutations.
+`ITEM_ID` — use for field mutations via GraphQL.
+`ISSUE_NUMBER` — use for `gh issue edit`, `gh issue comment`, sub-issue attachment.
+
+> Risk and Estimate are intentionally left unset at creation time — they are determined
+> during refinement sessions on the Discovery Board.
 
 ---
 
@@ -174,37 +171,42 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
   -f option="<small-medium-large-option-id>"
 ```
 
-> Risk and Estimate are intentionally left unset at creation time — they are determined during
-> the refinement sessions on the Discovery Board.
-
 ---
 
-## Linking child stories to their parent Epic
+## Attaching child stories as sub-issues to an Epic
 
-GitHub sub-issues require repository-backed issues and are not applicable to project draft items.
-Track the Epic-Story relationship by including a reference in each child story's body:
+Use the GraphQL `addSubIssue` mutation. You need the node IDs of both issues:
 
-```markdown
-**Parent Epic:** <Epic title> (project item <ITEM_ID>)
+```bash
+# Get node IDs
+EPIC_NODE_ID=$(gh issue view <epic-number> --repo <owner/repo> --json id --jq '.id')
+STORY_NODE_ID=$(gh issue view <story-number> --repo <owner/repo> --json id --jq '.id')
+
+# Attach
+gh api graphql -f query='
+mutation {
+  addSubIssue(input: {
+    issueId: "<epic-node-id>"
+    subIssueId: "<story-node-id>"
+  }) {
+    issue { number title }
+    subIssue { number title }
+  }
+}'
 ```
 
-And include the list of child stories in the Epic's body:
-
-```markdown
-**Child Stories:**
-- <Story title> (project item <ITEM_ID>)
-- <Story title> (project item <ITEM_ID>)
-```
+Repeat for each child story.
 
 ---
 
 ## Linking stories to the source PRD
 
-Since draft items have no repository backing, cross-references via `#N` are not available.
-Include the PRD reference directly in the story body:
+Add a comment to each story referencing the PRD issue:
 
-```markdown
-**Derived from PRD:** <PRD title> (project item <PRD_ITEM_ID>)
+```bash
+gh issue comment <story_number> \
+  --repo <owner/repo> \
+  --body "Derived from PRD #<prd_number>."
 ```
 
 ---
@@ -213,10 +215,10 @@ Include the PRD reference directly in the story body:
 
 ```
 Epics:
-  <ITEM_ID> — <Epic title>  [Type: Epic]
+  #12 — <Epic title>  [Type: Epic]  →  <url>
 
 User stories:
-  <ITEM_ID> — <short title>  [Type: User Story | Size: Medium]  (child of <Epic ITEM_ID>)
-  <ITEM_ID> — <short title>  [Type: User Story | Size: Small]   (child of <Epic ITEM_ID>)
-  <ITEM_ID> — <short title>  [Type: User Story | Size: Small]   (standalone)
+  #13 — <short title>  [Type: User Story | Size: Medium]  →  <url>  (sub-issue of #12)
+  #14 — <short title>  [Type: User Story | Size: Small]   →  <url>  (sub-issue of #12)
+  #15 — <short title>  [Type: User Story | Size: Small]   →  <url>  (standalone)
 ```

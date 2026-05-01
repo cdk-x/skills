@@ -15,7 +15,7 @@ description: >
 
 # User Story
 
-Reads a PRD and creates one **GitHub Project item** (draft issue) per user story with the
+Reads a PRD and creates one **GitHub Project item**  per user story with the
 correct **item type** and **project fields** set (Type, Size, Risk, Estimate). Stories that
 are too large to complete in one sprint become Epics — parent items with child user stories
 referenced in their body.
@@ -25,10 +25,12 @@ Available types in the project: `Epic`, `User Story`, `Feature`, `Bug`, `Task`.
 
 New items land on the **Discovery Board** in the **Analysis** column.
 
-> **GitHub model:** Items created by this skill are **GitHub Project items** (draft issues).
-> They live exclusively in the GitHub Project — there is no backing repository issue.
-> Use `gh project item-create` to create them and GraphQL to update or set fields.
-> Never use `gh issue create`, `gh issue list`, `gh issue edit`, or `gh issue comment`.
+> **GitHub model:** Items created by this skill are **real GitHub Issues** in a private backing
+> repository, added to the GitHub Project with `gh project item-add`. The backing repository is
+> private so Epics, User Stories, DoD, and DoR are never visible in any public repo — keeping all
+> project management logic internal even when the codebase is open source. Only implementation
+> Tasks are eventually created as issues in the public repository when a story is split for sprint
+> work. Resolve the backing repository from `AGENTS.md` / `CLAUDE.md` alongside the project number.
 
 ## Step 0 — Find the PRD and resolve the GitHub Project
 
