@@ -1,22 +1,25 @@
-# GitHub — Definition of Done project item
+# GitHub — Definition of Done issue
 
-Items created by this skill are **GitHub Project items** (draft issues). They live exclusively
-in the GitHub Project — there is no backing repository issue. Never use `gh issue create`,
-`gh issue edit`, `gh issue list`, or `gh issue comment` for these items.
+Items created by this skill are **real GitHub Issues** in a private backing repository,
+added to the GitHub Project. This keeps them invisible in any public repository while
+giving full issue functionality (open/closed state, comments, sub-issues).
 
 ---
 
-## Resolving the GitHub Project
+## Resolving the GitHub Project and backing repository
 
-Resolve before any operation:
+Resolve both before any operation:
 
-1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
+1. Check `AGENTS.md` and `CLAUDE.md` for:
+   - Project number/name and owner (keys like `GitHub Project`, `project number`)
+   - Private backing repository (keys like `GitHub Repository`, `backing repo`, `project repo`)
 2. If not found, list available projects and ask:
    ```bash
-   gh project list --owner <org-or-user>
+   gh project list --owner <org-or-user> --format json | jq '.projects[] | select(.number==<project_id>)'
    ```
 
-Record the **project number** and **owner** — every command in this skill uses them.
+Record the **project number**, **owner**, and **backing repository** (`<owner/repo>`) —
+all three are used in every command in this skill.
 
 ---
 
@@ -59,33 +62,42 @@ Record:
 
 ---
 
-## Searching for an existing DoD item
+## Searching for an existing DoD issue
 
 ```bash
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '.items[] | select(.title == "Definition of Done")'
+gh issue list \
+  --repo <owner/repo> \
+  --search "Definition of Done in:title" \
+  --json number,title,url,state
 ```
-
-Returns the project item's `id` (used for field mutations) if found.
 
 ---
 
-## Creating the project item
+## Creating the issue and adding it to the project
+
+Two steps — create the issue in the private backing repository, then add it to the project:
 
 ```bash
-ITEM_DATA=$(gh project item-create <project-number> \
-  --owner <org-or-user> \
+# Step 1 — Create the issue in the private backing repository
+ISSUE_URL=$(gh issue create \
+  --repo <owner/repo> \
   --title "Definition of Done" \
   --body "$(cat <<'EOF'
 <checklist content approved by user>
 EOF
-)" --format json)
+)")
+ISSUE_NUMBER="${ISSUE_URL##*/}"
 
-ITEM_ID=$(echo "$ITEM_DATA" | jq -r '.id')
-echo "Item ID: $ITEM_ID"
+# Step 2 — Add to the project and capture the item ID
+ITEM_ID=$(gh project item-add <project-number> \
+  --owner <org-or-user> \
+  --url "$ISSUE_URL" \
+  --format json | jq -r '.id')
+echo "Issue: $ISSUE_URL  |  Item ID: $ITEM_ID"
 ```
 
-`ITEM_ID` is the project item node ID — use it for all field mutations below.
+`ITEM_ID` is the project item node ID — use it for field mutations.
+`ISSUE_NUMBER` is the issue number — use it for `gh issue edit` and `gh issue comment`.
 
 ---
 
@@ -111,38 +123,18 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
 
 ---
 
-## Updating an existing item's body
-
-Draft issues require a different ID (the draft issue content ID, distinct from the project item ID).
-First resolve it, then update.
-
-### Step 1 — Get the draft issue ID from the project item
+## Updating an existing issue's body
 
 ```bash
-DRAFT_ID=$(gh api graphql -f query='
-query($id: ID!) {
-  node(id: $id) {
-    ... on ProjectV2Item {
-      content {
-        ... on DraftIssue { id }
-      }
-    }
-  }
-}' -f id="$ITEM_ID" --jq '.data.node.content.id')
+gh issue edit <number> \
+  --repo <owner/repo> \
+  --body "<updated checklist>"
 ```
 
-### Step 2 — Update title and/or body
+To record the update, add a comment:
 
 ```bash
-gh api graphql -f query='
-mutation($draftId: ID!, $body: String!) {
-  updateProjectV2DraftIssue(input: {
-    draftIssueId: $draftId
-    body: $body
-  }) {
-    draftIssue { id }
-  }
-}' -f draftId="$DRAFT_ID" -f body="<updated checklist>"
+gh issue comment <number> \
+  --repo <owner/repo> \
+  --body "DoD updated on <date>. Changes: <brief summary>."
 ```
-
-> To update the title as well, add `-f title="<new title>"` to the mutation input.

@@ -17,10 +17,11 @@ of type `docs`. This item serves as the team's shared reference — consulted du
 to determine which non-functional requirements are already covered globally and do not need
 individual acceptance criteria on every story.
 
-> **GitHub model:** Items created by this skill are **GitHub Project items** (draft issues).
-> They live exclusively in the GitHub Project — there is no backing repository issue.
-> Use `gh project item-create` to create them and GraphQL to update them.
-> Never use `gh issue create`, `gh issue list`, `gh issue edit`, or `gh issue comment`.
+> **GitHub model:** Items created by this skill are **real GitHub Issues** in a private backing
+> repository, added to the GitHub Project with `gh project item-add`. The backing repository is
+> private so issues are never visible in any public repo. Resolve it from `AGENTS.md` / `CLAUDE.md`
+> alongside the project number. Use `gh issue edit` and `gh issue comment` (with `--repo`) for
+> content updates. Project fields (Type, Status, etc.) are set via GraphQL on the project item.
 
 ## Step 0 — Resolve the GitHub Project
 
@@ -29,7 +30,7 @@ Resolve before any operation:
 1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
 2. If not found, list available projects and ask:
    ```bash
-   gh project list --owner <org-or-user>
+   gh project list --owner <org-or-user> --format json | jq '.projects[] | select(.number==<project_id>)'
    ```
 
 Read `references/github.md` for the exact commands.
