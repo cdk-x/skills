@@ -18,6 +18,12 @@ description: >
 
 Lead a full refinement session for a user story on the Discovery Board. Analyzes Functional and Non-Functional Requirements, enriches existing acceptance criteria, sets Risk and Estimate fields, and transitions the story through the refinement workflow.
 
+> **GitHub model:** Stories on the Discovery Board are **GitHub Project items** (draft issues).
+> They have no backing repository issue. Never use `gh issue view`, `gh issue list`,
+> `gh issue edit`, or `gh issue comment`. All reads and writes go through `gh project`
+> CLI or the GraphQL API. Refinement session notes are appended to the item body (not as
+> comments, since draft issues do not support them).
+
 **Board transitions handled by this skill:**
 
 ```
@@ -36,13 +42,7 @@ Ready for Implementation
 
 If an issue number was passed directly (e.g. `/refine-story 42` or `/refine-story #42`), use it immediately — skip listing and go straight to the status check below.
 
-If no issue was specified, list stories awaiting refinement:
-
-```bash
-gh issue list --search "is:open" --json number,title,url
-```
-
-Also attempt to filter by `Status = Ready for Refinement` on the GitHub Project (see `references/github.md`). Show the list to the user and ask which story to refine.
+If no issue was specified, list stories awaiting refinement via the GitHub Project (see `references/github.md` for the `gh project item-list` command and the GraphQL filter by `Status = Ready for Refinement`). Show the list to the user and ask which story to refine.
 
 Resolve the GitHub Project before continuing (check `AGENTS.md` / `CLAUDE.md`, or ask once). Read `references/github.md` for all commands used in this skill.
 
@@ -70,14 +70,12 @@ Confirm to the user: _"Story #N is now In Refinement."_
 
 ## Step 2 — Fetch the story and its full context
 
-```bash
-gh issue view <number> --json number,title,body,comments,url
-```
+Fetch the project item content via GraphQL (see `references/github.md` for the `node(id:)` query).
 
 From the response:
-1. **Read all comments** — they may contain prior discussion, team decisions, or open questions from earlier sessions. Extract any relevant context before analysing.
-2. **Find the PRD link** — search comments for `"Derived from PRD #<N>"`. If found, fetch the PRD body for additional context.
-3. **Find the parent Epic** — check if the story has a parent issue. If yes, fetch the Epic body and extract its **Success Criteria** (SC). The ACs written for this story must collectively contribute to satisfying those SCs.
+1. **Read the full body** — it may contain prior refinement session notes (appended after a `---` separator), team decisions, or open questions from earlier sessions. Extract any relevant context before analysing.
+2. **Find the PRD link** — search the body for `"Derived from PRD:"`. If found, fetch that PRD project item for additional context.
+3. **Find the parent Epic** — check the body for `"Parent Epic:"`. If present, fetch the Epic item and extract its **Success Criteria** (SC). The ACs written for this story must collectively contribute to satisfying those SCs.
 
 Note: the story already has acceptance criteria from `/user-story` — treat them as a first draft, not final. Do not discard them; enrich them.
 
@@ -228,15 +226,17 @@ Iterate based on user feedback. Return to any earlier step if changes are needed
 
 ---
 
-## Step 10 — Update the GitHub Issue
+## Step 10 — Update the project item
 
-Once the user approves, update the story:
+Once the user approves, update the story via `updateProjectV2DraftIssue` (see `references/github.md`):
 
-1. **Rewrite the issue body** using `assets/refined-story-template.md` — fill in User Story sentence (original), FRs, NFRs, enriched ACs, and Epic SC coverage.
+1. **Rewrite the item body** using `assets/refined-story-template.md` — fill in User Story sentence (original), FRs, NFRs, enriched ACs, and Epic SC coverage.
 
-2. **Add a refinement session comment** — decisions and context only. Do NOT include Risk, Estimate, Value, or Size — those are project fields, not comment content:
+2. **Append a refinement session block** at the end of the body (after a `---` separator) — decisions and context only. Do NOT include Risk, Estimate, Value, or Size — those are project fields, not body content. Draft issues do not support comments; the body is the only place to record session history:
 
-   ```
+   ```markdown
+   ---
+
    ## Refinement Session — <date>
 
    **Functional Requirements identified**: FR-1, FR-2, ...
@@ -246,7 +246,7 @@ Once the user approves, update the story:
    **Open questions**: <unresolved questions, or "None">
    ```
 
-3. **Ask the user**: _"Do you want to add any notes from the team's discussion to this comment before closing the session?"_ — incorporate their input.
+3. **Ask the user**: _"Do you want to add any notes from the team's discussion to this session block before closing?"_ — incorporate their input.
 
 ---
 
