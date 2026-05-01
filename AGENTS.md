@@ -11,6 +11,7 @@ skills/
 ├── plan/                   → Technical plan generation from specs
 ├── prd/                    → Product Requirements Document generation and publishing
 ├── prd-to-issues/          → Break a PRD into GitHub Issues or Jira Stories+Tasks
+├── user-story/             → Create GitHub user story issues from a PRD
 └── (future skills)
 ```
 
@@ -25,6 +26,7 @@ Skills are symlinked into consuming repos via `.agents/skills/` or `.claude/skil
 | `plan` | `skills/plan/` | The technical plan skill |
 | `prd` | `skills/prd/` | The PRD skill |
 | `prd-to-issues` | `skills/prd-to-issues/` | The PRD-to-issues skill |
+| `user-story` | `skills/user-story/` | The user story skill |
 | `repo` | root-level files | Repository config, CI, docs |
 
 As new skills are added, register them here as scopes.
