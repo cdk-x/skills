@@ -1,25 +1,27 @@
-# GitHub — Definition of Ready project item
+# GitHub — Definition of Ready issue
 
-Items created by this skill are **GitHub Project items** (draft issues). They live exclusively
-in the GitHub Project — there is no backing repository issue. Never use `gh issue create`,
-`gh issue edit`, `gh issue list`, or `gh issue comment` for these items.
+Items created by this skill are **real GitHub Issues** in a private backing repository,
+added to the GitHub Project. This keeps them invisible in any public repository while
+giving full issue functionality (open/closed state, comments, sub-issues).
 
-The commands here are identical in structure to `definition-of-done/references/github.md` —
-only the item title and content differ. Refer to that file for full GraphQL query details.
+The commands here follow the same pattern as `definition-of-done/references/github.md` —
+only the issue title and content differ.
 
 ---
 
-## Resolving the GitHub Project
+## Resolving the GitHub Project and backing repository
 
-Resolve before any operation:
+Resolve both before any operation:
 
-1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner.
+1. Check `AGENTS.md` and `CLAUDE.md` for:
+   - Project number/name and owner
+   - Private backing repository (keys like `GitHub Repository`, `backing repo`, `project repo`)
 2. If not found, list available projects and ask:
    ```bash
-   gh project list --owner <org-or-user>
+   gh project list --owner <org-or-user> --format json | jq '.projects[] | select(.number==<project_id>)'
    ```
 
-Record the **project number** and **owner**.
+Record the **project number**, **owner**, and **backing repository** (`<owner/repo>`).
 
 ---
 
@@ -51,27 +53,35 @@ Record:
 
 ---
 
-## Searching for an existing DoR item
+## Searching for an existing DoR issue
 
 ```bash
-gh project item-list <project-number> --owner <org-or-user> --format json \
-  | jq '.items[] | select(.title == "Definition of Ready")'
+gh issue list \
+  --repo <owner/repo> \
+  --search "Definition of Ready in:title" \
+  --json number,title,url,state
 ```
 
 ---
 
-## Creating the project item
+## Creating the issue and adding it to the project
 
 ```bash
-ITEM_DATA=$(gh project item-create <project-number> \
-  --owner <org-or-user> \
+# Step 1 — Create the issue in the private backing repository
+ISSUE_URL=$(gh issue create \
+  --repo <owner/repo> \
   --title "Definition of Ready" \
   --body "$(cat <<'EOF'
 <checklist content approved by user>
 EOF
-)" --format json)
+)")
+ISSUE_NUMBER="${ISSUE_URL##*/}"
 
-ITEM_ID=$(echo "$ITEM_DATA" | jq -r '.id')
+# Step 2 — Add to the project
+ITEM_ID=$(gh project item-add <project-number> \
+  --owner <org-or-user> \
+  --url "$ISSUE_URL" \
+  --format json | jq -r '.id')
 ```
 
 ---
@@ -98,33 +108,18 @@ mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
 
 ---
 
-## Updating an existing item's body
-
-### Step 1 — Get the draft issue ID
+## Updating an existing issue's body
 
 ```bash
-DRAFT_ID=$(gh api graphql -f query='
-query($id: ID!) {
-  node(id: $id) {
-    ... on ProjectV2Item {
-      content {
-        ... on DraftIssue { id }
-      }
-    }
-  }
-}' -f id="$ITEM_ID" --jq '.data.node.content.id')
+gh issue edit <number> \
+  --repo <owner/repo> \
+  --body "<updated checklist>"
 ```
 
-### Step 2 — Update body
+To record the update, add a comment:
 
 ```bash
-gh api graphql -f query='
-mutation($draftId: ID!, $body: String!) {
-  updateProjectV2DraftIssue(input: {
-    draftIssueId: $draftId
-    body: $body
-  }) {
-    draftIssue { id }
-  }
-}' -f draftId="$DRAFT_ID" -f body="<updated checklist>"
+gh issue comment <number> \
+  --repo <owner/repo> \
+  --body "DoR updated on <date>. Changes: <brief summary>."
 ```
