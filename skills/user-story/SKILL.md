@@ -1,47 +1,51 @@
 ---
 name: user-story
 description: >
-  Create GitHub Issues for each user story extracted from a PRD, setting the
-  correct issue type and project fields (Type, Size, Risk, Estimate) on the
-  GitHub Project. Creates Epic issues as parents for large stories, with child
-  user stories attached as native sub-issues. Use this skill whenever the user
-  wants to create user stories from a PRD, generate Discovery Board items from
-  a spec, break a product document into GitHub issues, populate the product
-  backlog, or create user story issues on GitHub Projects. Trigger on "create
-  user stories", "user stories from PRD", "user story", "generate backlog
-  items", "populate discovery board", "create issues from PRD", or any
-  variation of turning a product requirements document into structured user
-  story issues.
+  Create GitHub Project items for each user story extracted from a PRD, setting
+  the correct item type and project fields (Type, Size, Risk, Estimate) on the
+  GitHub Project. Creates Epic items as parents for large stories, with child
+  user stories referenced via body links. Use this skill whenever the user wants
+  to create user stories from a PRD, generate Discovery Board items from a spec,
+  break a product document into project items, populate the product backlog, or
+  create user story items on a GitHub Project. Trigger on "create user stories",
+  "user stories from PRD", "user story", "generate backlog items", "populate
+  discovery board", "create issues from PRD", or any variation of turning a
+  product requirements document into structured user story project items.
 ---
 
 # User Story
 
-Reads a PRD and creates one GitHub Issue per user story with the correct
-**issue type** and **project fields** set (Type, Size, Risk, Estimate). Stories
-that are too large to complete in one sprint become Epics — parent issues with
-child user stories attached as native GitHub sub-issues.
+Reads a PRD and creates one **GitHub Project item** (draft issue) per user story with the
+correct **item type** and **project fields** set (Type, Size, Risk, Estimate). Stories that
+are too large to complete in one sprint become Epics — parent items with child user stories
+referenced in their body.
 
-Issue types used by this skill: `Epic` and `User Story`.
+Item types used by this skill: `Epic` and `User Story`.
 Available types in the project: `Epic`, `User Story`, `Feature`, `Bug`, `Task`.
 
-New issues land on the **Discovery Board** in the **Analysis** column.
+New items land on the **Discovery Board** in the **Analysis** column.
 
-## Step 0 — Find the PRD
+> **GitHub model:** Items created by this skill are **GitHub Project items** (draft issues).
+> They live exclusively in the GitHub Project — there is no backing repository issue.
+> Use `gh project item-create` to create them and GraphQL to update or set fields.
+> Never use `gh issue create`, `gh issue list`, `gh issue edit`, or `gh issue comment`.
 
-Check the context for a clear signal:
+## Step 0 — Find the PRD and resolve the GitHub Project
 
-- GitHub issue number or URL → `gh issue view <number> --json title,body`
+Check the context for a clear signal for the PRD:
+
+- GitHub project item ID → fetch via GraphQL `node(id:)` query (see `references/github.md`)
 - Confluence URL or page title → see `references/github.md` for the Confluence fetch approach
 - PRD content already in the conversation → use it directly
 
-If the source is unclear, ask once: *"Where is the PRD — a GitHub issue number, a Confluence page, or is it already in our conversation?"*
+If the source is unclear, ask once: *"Where is the PRD — a GitHub Project item ID, a Confluence page, or is it already in our conversation?"*
 
-Also resolve which **GitHub Project** to use:
-1. Check `AGENTS.md` and `CLAUDE.md` in the current repo for a configured project name or number (look for keys like `GitHub Project`, `project`, or similar)
+Also resolve the **GitHub Project** before creating any items:
+1. Check `AGENTS.md` and `CLAUDE.md` for a configured project name/number and owner
 2. If found, use it directly
-3. If not found, ask the user once: *"Which GitHub Project should these issues go into?"*
+3. If not found, ask the user once: *"Which GitHub Project should these items go into?"*
 
-Read `references/github.md` to resolve the project number and its field IDs before creating any issues.
+Read `references/github.md` to resolve the project number and field IDs before creating any items.
 
 ## Step 1 — Extract user stories
 
@@ -66,11 +70,11 @@ For each story, ask: *can one developer complete this within a single sprint?*
 
 When in doubt, lean toward creating an Epic — it is easy to collapse in refinement.
 
-## Step 3 — Compose issue titles and show the proposed breakdown for review
+## Step 3 — Compose item titles and show the proposed breakdown for review
 
-The **issue title** is not the user story sentence. It must be short, identifiable, and
+The **item title** is not the user story sentence. It must be short, identifiable, and
 scannable on a board — a noun phrase that names the feature or capability being delivered.
-The "As a / I want / so that" sentence goes in the **issue body**, not the title.
+The "As a / I want / so that" sentence goes in the **item body**, not the title.
 
 Good title examples:
 - `Provider lifecycle hooks (preSynthesize / postSynthesize)`
@@ -99,22 +103,22 @@ Ask the user:
 
 Iterate until the user approves.
 
-## Step 4 — Create the GitHub Issues and set project fields
+## Step 4 — Create the project items and set fields
 
 Read `references/github.md` for the exact commands. Follow this order:
 
 1. **Resolve project field IDs** — fetch the project's field metadata once to get the IDs for `Type` and `Size` fields and their option IDs (e.g. the option ID for "Epic", "User Story", "Small", "Medium", "Large")
-2. **Create Epics first** — use the short title as the issue title; create the issue, add it to the project, set `Type = Epic`, set `Size` if applicable
-3. **Create each User Story** — use the short title as the issue title; create the issue, add it to the project, set `Type = User Story`, set `Size`
-4. **Attach child stories to their Epic** as native GitHub sub-issues
-5. **Link each story to the source PRD** via a comment reference — no manual text in the body
+2. **Create Epics first** — use `gh project item-create` with the short title; set `Type = Epic` and `Size` via `updateProjectV2ItemFieldValue`
+3. **Create each User Story** — use `gh project item-create` with the short title; set `Type = User Story` and `Size`
+4. **Link child stories to their Epic** — include the Epic item ID in each child story's body, and the list of children in the Epic's body (see `references/github.md`)
+5. **Link each story to the source PRD** — include the PRD item ID in each story's body
 
-Do NOT modify the source PRD issue.
+Do NOT modify the source PRD item.
 
 ## Step 5 — Report
 
 List everything created:
-- Epic issue numbers and URLs (if any), with Type and project fields set
-- User story issue numbers and URLs, with Type, Size, and parent Epic
+- Epic item IDs (if any), with Type and project fields set
+- User story item IDs, with Type, Size, and parent Epic reference
 
-Remind the user that the new issues are in the Discovery Board's **Analysis** column and will move through **Ready for Refinement → In Refinement → Ready for Implementation** before a sprint.
+Remind the user that the new items are in the Discovery Board's **Analysis** column and will move through **Ready for Refinement → In Refinement → Ready for Implementation** before a sprint.
