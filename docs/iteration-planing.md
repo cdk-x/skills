@@ -88,3 +88,19 @@ A spike is a task included in a iteration plan that is being undertaken specific
 
 ### Estimate Tasks
 
+The next step in velocity-driven iteration planning is to estimate each task. Task estimates are expresed in ideal time. So if I thing that a task will take me six hours of working time, I give it an estimate of six hours. I do this even if six hours of time on the tas will take me an entire eight-hour day.
+
+Task estimating on an agile project should be a group endeavor. For reasons:
+
+1. Because tasks are not allocated to specific indiviauls during iteration planning, it is imposible to ask the specific person who will do the work.
+2. Even though we expect a specific individual will be the one to do a task, and even though he may know the most about that task it does no t mean taht other have nothing to contribute.
+3. Hearing how long something is expected to take often helps teams identify misunderstandings about a user story task. Upon hearing an unexpectedly high estimate, a product owner or analyst may discover that the team is heading toward a more detailed soluciont thatn necessary.
+4. When the person who will do the work provides the estimate, the person's pride and ego may make him reluctant to admit later that an estimate was incorrect. When an estimate is made collaboratively, this reluctance to admit an estimate is wrong goes aways.
+
+#### some desing is OK
+
+The product owner, analysts, and user interface designers may discuss product design, how much of a feature should be implemented, and how it will appear to users. The developers may discuss options of how they will implemente what is needed. Both types of design discussion are needed and appropiate. The best warning sign of taking the design too far during iteration plan. Save those discussions for outside iteration planning.
+
+#### The righ size for a task
+
+The task you create should be of an approxmate size so that each developer is able to finish an average of one per day. This size works well for allowing work to flow smoothly through your agile team development process. Larger tasks tend to get bottled up with a developer or two, and the rest of the team can be left waiting fo rthem to complete de task.
