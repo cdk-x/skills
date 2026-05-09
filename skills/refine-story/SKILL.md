@@ -182,10 +182,14 @@ Criteria. Note any SC not yet covered.
 All four fields must be defined before the story can be considered ready. Propose each with
 a brief justification; the user may adjust any of them.
 
-**Business Value** (benefit of delivering this story):
-- Check if already set. If not, ask the PO to assign a number.
-- Represents revenue, cost saving, customer retention, or strategic opportunity.
-- Free number field (`customfield_10098`).
+**Business Value** (`customfield_10098`) — number **1–50**:
+- Check if already set. Propose a value with justification.
+- 1–10: low impact (minor UX polish, internal tooling with no user-facing effect)
+- 11–25: medium impact (useful feature, moderate adoption or retention effect)
+- 26–40: high impact (foundational feature, strong adoption driver or revenue-related)
+- 41–50: critical impact (blocking adoption, compliance requirement, or major revenue risk)
+- For foundational stories in early development whose absence blocks the whole product,
+  set high values (30–45).
 
 **Risk** (`customfield_10131`) — select one of: `1` / `5` / `10` based on:
 - External dependencies or integrations
@@ -194,7 +198,12 @@ a brief justification; the user may adjust any of them.
 - Technical debt or legacy code involved
 
 **Story Points** (`customfield_10041`) — Fibonacci number:
-- Check if already set from `/user-story`. Confirm it still reflects current understanding, or update.
+- Check if already set from `/user-story`. After completing FR extraction (Step 3),
+  re-estimate SP independently based on the enriched FR list.
+- If the re-estimate differs from the stored value by more than one Fibonacci step
+  (e.g. stored=2, re-estimate=5), flag explicitly:
+  _"The original SP estimate was N but the enriched FRs suggest M. Please confirm
+  before closing the session."_
 - 1–2: well-understood, minimal complexity
 - 3: straightforward with some unknowns
 - 5: moderate complexity, some risk
@@ -205,6 +214,32 @@ If Story Points = 13, flag: _"This story may be too large for one sprint. Consid
 
 **Size** (`customfield_10100`) — select one of: `XXS` / `XS` / `S` / `M` / `L` / `XL` / `XXL`
 - Set by `/user-story` at creation. Confirm it still reflects current scope, or update.
+
+**Order Rank** (computed — do not ask the user):
+After BV, Risk, and SP are confirmed, compute:
+
+```
+Order Rank = (Business Value + Risk) / Story_Points
+```
+
+Higher rank = higher priority in the backlog. Starting point only; dependencies override rank.
+Stored in `customfield_10264` (number).
+
+Example: BV=30, Risk=5, SP=3 → (30+5)/3 = 11.67
+
+**Priority** (derived from Order Rank — Jira built-in field):
+
+| Order Rank | Priority |
+|------------|----------|
+| ≥ 14       | Highest  |
+| 12–13.9    | High     |
+| 10–11.9    | Medium   |
+| 8–9.9      | Low      |
+| < 8        | Lowest   |
+
+Thresholds calibrated for early-stage backlogs (typical scores 7–20). Revisit when the
+backlog grows beyond ~20 stories.
+Stored as `{"name": "High"}` (etc.) in the `priority` field.
 
 ---
 
@@ -247,7 +282,7 @@ Present the complete summary and wait for the user's approval:
 ### Epic Success Criteria
 - SC-1: "<SC text>" → covered by AC-2, AC-3 ✅
 
-### Risk: 5 | Story Points: 5 | Business Value: 8 | Size: M
+### Risk: 5 | SP: 3 | BV: 30 | Size: S | Order Rank: 11.67 | Priority: Medium
 
 ### DoR Check
 ✅ Small  ✅ Sized  ✅ Detail  ✅ Understood  ✅ All fields set
@@ -287,8 +322,9 @@ Once the user approves, update the story (see `references/jira.md`):
 
 ## Step 11 — Set fields and transition
 
-Set all four fields via `mcp__atlassian__editJiraIssue` (see `references/jira.md`):
-**Business Value**, **Risk**, **Story Points**, and **Size** (update Size only if it changed).
+Set all six fields via `mcp__atlassian__editJiraIssue` (see `references/jira.md`):
+**Business Value**, **Risk**, **Story Points**, **Size** (update only if changed),
+**Order Rank** (`customfield_10264`), and **Priority** (`priority` field, e.g. `{"name": "High"}`).
 
 **If DoR ✅ (all criteria met):**
 - Get available transitions and apply the "Ready for Implementation" one via
