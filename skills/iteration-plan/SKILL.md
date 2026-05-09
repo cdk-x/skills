@@ -32,19 +32,20 @@ to implement it — no additional context needed.
 **Input modes:**
 - Single story key: `/iteration-plan CDKX-10` → use directly
 - Multiple keys: `/iteration-plan CDKX-10 CDKX-11` → process each in order
-- No arguments → search the active sprint:
+- No arguments → search stories ready for iteration planning:
   ```
-  project = <KEY> AND sprint in openSprints() AND issuetype = Story ORDER BY priority ASC
+  project = <KEY> AND sprint in futureSprints() AND issuetype = Story AND status = "To Do" ORDER BY priority ASC
   ```
   Show results and ask which stories to include.
 
-Verify each story is in `Ready for Implementation` before proceeding. If not, stop and
-inform the user — moving to Ready for Implementation is a manual step after `/refine-story`.
+Verify each story meets both conditions:
+1. Status is `To Do`
+2. Assigned to a future (not yet started) sprint — `sprint in futureSprints()`
 
-**Query available sub-task types** for the project via `mcp__atlassian__getJiraProjectIssueTypesMetadata`.
-Save the type IDs — you will use them in Step 7. Read `references/jira.md` for the call.
-
-Resolve the Jira project key from `AGENTS.md` / `CLAUDE.md`. If not found, ask once.
+If either condition fails, stop and inform the user. Iteration planning happens while
+preparing the next sprint: the story must already be assigned to it (sprint planning),
+but the sprint must not have started yet. If the story has no sprint or is in an active
+sprint, it is not ready for iteration planning.
 
 ---
 
@@ -62,7 +63,11 @@ Read `references/jira.md` for Jira fetch calls.
 
 ## Step 2 — Technical codebase analysis
 
-Read `references/codebase-analysis.md` for the full process.
+Detect the project language by reading `CLAUDE.md` (look for keywords:
+`TypeScript`, `ts-node`, `npm`, `pnpm`, `tsconfig` → TypeScript;
+`Go`, `go.mod`, `go install` → Go). Then load the matching reference:
+- **TypeScript project**: `references/codebase-analysis-typescript.md`
+- **Go project**: `references/codebase-analysis-go.md`
 
 Two sequential sub-processes. The output is **not a document** — it feeds directly into
 the sub-task descriptions in Step 4. Every file path, pattern reference, and interface
@@ -181,7 +186,7 @@ For each sub-task, follow this sequential pattern:
    - `parent`: the Story key
    - `summary`: short noun-phrase title (never "As a…")
    - `description`: full self-contained body from `assets/task-template.md`
-   - `customfield_10231`: `"AFK"` or `"HITL"` — the mode assigned in Step 4
+   - `customfield_10231`: `{"id": "<option-id>"}` — query allowed values via `getJiraIssueTypeMetaWithFields` at runtime to get the correct option IDs for AFK and HITL
    Save the returned issue key.
 
 2. Immediately call `createIssueLink` for every dependency of that sub-task identified in

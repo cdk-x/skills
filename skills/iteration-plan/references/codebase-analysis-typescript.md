@@ -1,8 +1,8 @@
-# Codebase Analysis — Iteration Plan
+# Codebase Analysis (TypeScript) — Iteration Plan
 
-This reference covers the two sequential sub-processes in Step 2 of `/iteration-plan`.
-The output feeds directly into sub-task descriptions — every finding becomes content
-in the relevant sub-task body, not a separate document.
+This reference covers the two sequential sub-processes in Step 2 of `/iteration-plan`
+for **TypeScript projects**. The output feeds directly into sub-task descriptions —
+every finding becomes content in the relevant sub-task body, not a separate document.
 
 ---
 
@@ -28,14 +28,14 @@ Note any MUST rules that will constrain implementation choices.
 find . -maxdepth 3 -type d | grep -v node_modules | grep -v .git | grep -v dist
 
 # Find entry points
-find . -name "main.*" -o -name "index.*" -o -name "cmd/*" | grep -v node_modules
+find . -name "index.ts" -o -name "main.ts" | grep -v node_modules
 ```
 
 Identify:
-- Which packages/modules exist
+- Which packages/modules exist under `src/`
 - Where the CLI entry points are
 - Where the domain logic lives (separate from infrastructure)
-- Where tests live and what framework is used
+- Where tests live and what framework is used (Jest / Vitest)
 
 ### 1.3 Map each FR to the codebase
 
@@ -46,39 +46,39 @@ For each FR in the story, answer:
    - If no: identify where it should live by analogy with existing code
 
 2. **Which files will be touched?**
-   - List exact paths (e.g., `internal/planner/dag.go`, `cmd/plan.go`)
+   - List exact paths (e.g., `src/planner/dag.ts`, `src/cli/index.ts`)
 
 3. **What patterns should be followed?**
    - Find the closest existing example with `grep` or `find`
-   - Note the file path and line range: `internal/synth/manifest.go:45-80`
+   - Note the file path and line range: `src/synth/manifest.ts:45-80`
 
 4. **What interfaces need to be implemented or extended?**
    - Find the interface definition
    - Note the exact signature
 
 ```bash
-# Find relevant types/interfaces
-grep -r "type.*interface" --include="*.go" .
+# Find relevant interfaces
 grep -r "interface " --include="*.ts" src/
+grep -r "class.*implements" --include="*.ts" src/
 
 # Find how similar features are structured
-grep -r "func.*Plan\|func.*parse\|func.*load" --include="*.go" .
+grep -r "export function\|export const" --include="*.ts" src/ | grep -i "plan\|parse\|load"
 ```
 
 ### 1.4 Find test patterns
 
 Identify how tests are written in this repo:
-- Test file naming convention (`_test.go`, `.spec.ts`, `.test.ts`)
+- Test file naming convention (`.spec.ts`, `.test.ts`)
 - Test helpers and fixtures used
 - How mock dependencies are structured
 - Example of a well-written test to reference in sub-task descriptions
 
 ```bash
 # Find test files
-find . -name "*_test.go" -o -name "*.spec.ts" -o -name "*.test.go" | head -20
+find . -name "*.spec.ts" -o -name "*.test.ts" | grep -v node_modules | head -20
 
 # Find test helpers
-find . -path "*/testutil/*" -o -path "*/fixtures/*" -o -path "*/__mocks__/*" | head -10
+find . -path "*/__mocks__/*" -o -path "*/fixtures/*" | grep -v node_modules | head -10
 ```
 
 ---
@@ -94,9 +94,9 @@ Create a mental (or explicit) table:
 
 | FR | ACs it covers | Module/files | Implementation path clear? |
 |----|--------------|--------------|---------------------------|
-| FR-1 | AC-1, AC-6 | `cmd/plan.go` | ✅ |
-| FR-4 | AC-7 | `internal/planner/` | ⚠️ no existing similar code |
-| FR-9 | AC-8 | `internal/planner/dag.go` | ✅ verbatim copy |
+| FR-1 | AC-1, AC-6 | `src/cli/index.ts` | ✅ |
+| FR-4 | AC-7 | `src/planner/` | ⚠️ no existing similar code |
+| FR-9 | AC-8 | `src/planner/dag.ts` | ✅ verbatim copy |
 
 ### 2.2 Flag gaps and spikes
 
@@ -114,7 +114,7 @@ Check if the story's implementation will:
 
 ```bash
 # Find all usages of a function/type before changing it
-grep -r "FunctionName\|TypeName" --include="*.go" . | grep -v "_test.go"
+grep -r "FunctionName\|TypeName" --include="*.ts" src/ | grep -v "\.spec\.ts"
 ```
 
 Flag conflicts for the Architecture Design sub-task (HITL) if a breaking change is needed.
@@ -123,7 +123,7 @@ Flag conflicts for the Architecture Design sub-task (HITL) if a breaking change 
 
 Check whether the test infrastructure supports the new sub-tasks:
 - Are fixtures/mocks available for the data structures involved?
-- Does the test framework support the assertion style needed (e.g., DAG equality)?
+- Does the test framework support the assertion style needed?
 - Will integration tests need a test harness that doesn't exist yet?
 
 If infrastructure is missing, add a sub-task to create it (type: Development or Automation).
