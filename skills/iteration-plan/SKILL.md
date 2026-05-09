@@ -72,6 +72,15 @@ signature discovered here will appear verbatim in the relevant sub-task's body.
 Map each FR to concrete modules, files, and interfaces in the codebase. Find existing
 patterns to follow. Understand the repo's conventions (CLAUDE.md, CONTRIBUTING.md, etc.).
 
+For each new class identified, classify it as:
+- **Stateful** (holds data between calls, injected dependencies): instance methods,
+  constructor injection — e.g., `new CliProgram(version).build()`
+- **Stateless service** (pure computation, no injected state): static methods —
+  e.g., `NodeVersionGuard.check()`, `CrnParser.parse(input)`
+
+This classification feeds directly into the Interface Contracts and Project Rules Check
+sections of each sub-task description.
+
 **2b. Coverage and gap analysis:**
 Cross-reference each AC with the code. Flag FRs with no clear implementation path and
 ACs with no existing module to extend — these are spike candidates.
@@ -113,7 +122,11 @@ Map each sub-task to the correct Jira issue type from Step 0:
 
 Use `assets/task-template.md` for every sub-task description.
 The description must be **self-contained**: file paths, pattern references with `file:line`,
-interface signatures, test cases, ACs covered. A dev or AFK agent reads only this.
+interface signatures, ACs covered. A dev or AFK agent reads only this.
+
+Apply the statefulness classification from Step 2: stateless classes must expose static
+methods (Service pattern). Reflect this in the Interface Contracts and Project Rules Check
+sections of each sub-task.
 
 ---
 
