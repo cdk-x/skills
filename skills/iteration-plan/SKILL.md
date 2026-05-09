@@ -174,13 +174,20 @@ Iterate until the user approves.
 
 Read `references/jira.md` for the exact MCP calls.
 
-1. For each sub-task, call `mcp__atlassian__createJiraIssue` with:
+For each sub-task, follow this sequential pattern:
+
+1. Call `mcp__atlassian__createJiraIssue` with:
    - `issuetype`: the type ID from Step 0 matching the sub-task's type
    - `parent`: the Story key
    - `summary`: short noun-phrase title (never "As a…")
    - `description`: full self-contained body from `assets/task-template.md`
+   - `customfield_10231`: `"AFK"` or `"HITL"` — the mode assigned in Step 4
+   Save the returned issue key.
 
-2. Create `Blocks` issue links for every dependency identified in Step 5.
+2. Immediately call `createIssueLink` for every dependency of that sub-task identified in
+   Step 5. Do not move to the next sub-task until all its Blocks links are created.
+
+Never batch all issue creations before creating links.
 
 ---
 
