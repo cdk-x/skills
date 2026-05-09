@@ -19,8 +19,7 @@ Divide one or more refined Jira Stories into technical sub-tasks with full imple
 detail. Each sub-task is self-contained: a developer or AFK agent reads only that sub-task
 to implement it — no additional context needed.
 
-> **Run from the implementation repository** (e.g. `cdkx-runner`), not from the PM repo.
-> The codebase analysis in Step 2 requires direct access to the source code.
+> **Run from the repository where the source code lives.** The codebase analysis in Step 2 requires direct access to the source code. If the implementation lives in this same monorepo, you are already in the right place.
 >
 > **Jira model:** Sub-tasks are child issues of the Story, created with the project's
 > configured sub-task types (queried at runtime). Read `references/jira.md` for all MCP calls.
