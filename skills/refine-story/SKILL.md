@@ -95,6 +95,16 @@ From the response:
    `mcp__atlassian__getJiraIssue` and extract its description to find **Success Criteria**
    (SC). The ACs written for this story must collectively contribute to satisfying those SCs.
 
+4. **Read linked issues** — check `fields.issuelinks` in the story response.
+   For every link whose type name is `"is blocked by"` (inward link):
+   a. Fetch that story via `mcp__atlassian__getJiraIssue`.
+   b. Extract its Functional Requirements, ACs, and any relevant context from
+      its description.
+   c. Use this context during FR extraction (Step 3) and AC enrichment (Step 6):
+      avoid duplicating behaviour already provided by the blocking story, and
+      reference the interfaces or outputs it produces.
+   Links of type `"blocks"` (outward) do not require fetching.
+
 Note: the story already has acceptance criteria from `/user-story` — treat them as a first
 draft, not final. Do not discard them; enrich them.
 
